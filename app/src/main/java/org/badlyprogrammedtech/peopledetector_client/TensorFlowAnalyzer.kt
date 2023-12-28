@@ -12,8 +12,10 @@ import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
 import java.io.FileWriter
 import java.nio.ByteBuffer
+import java.time.Instant
 import java.util.Calendar
 import java.util.Date
+import java.util.LinkedHashMap
 import java.util.Timer
 import java.util.TimerTask
 
@@ -22,11 +24,10 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
     private lateinit var objectDetector: ObjectDetector
     private var humanList = ArrayList<Human>()
     private val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+
     private var timerTask: TimerTask = object : TimerTask() {
         override fun run() {
             Log.i("TensorFlowAnalyzer", "Log task running")
-
-
 
             try {
                 if (humanList.size > 1) {
@@ -47,19 +48,28 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
                         timeRange.checkAndUpdateLast(it.timeDetected)
                     }
 
-                    val slotCount = timeRange.getMinutesBetween().floorDiv(30).toInt()
+                    val slotCount = timeRange.getMinutesBetween().floorDiv(timeBetweenSlots).toInt()
+                    val baseTime = timeRange.first
 
                     val timeSlots = ArrayList<HumanTimeSlot>()
 
-                    for (human in humanList) {
-                        human.timeDetected
+                    val humansInTimeSlots = ArrayList<Long>()
+
+                    humanList.forEach {
+                        humansInTimeSlots[timeRange.getSlotFromTime(it.timeDetected, slotCount)]++
                     }
 
-                    for (booptupeDevice in humanList) {
-//                        val deviceMacAddress = booptupeDevice.macaroniAddress
-                        val deviceTimeDetected = booptupeDevice.timeDetected
-//                        val deviceRssi = booptupeDevice.rssi
-                        fileWriter.write("$deviceTimeDetected\n")
+                    val calendar = Calendar.getInstance()
+
+                    for (slot in 0..slotCount) {
+                        calendar.time = baseTime
+                        calendar.add(Calendar.MINUTE, slot * 30)
+                        timeSlots.add(HumanTimeSlot(calendar.time, humansInTimeSlots.get(slot)))
+                    }
+
+                    for (humanInTimeSlot in humansInTimeSlots) {
+                        val slotTime = Date(timeRange.minutesToMs(humanInTimeSlot) + timeRange.first.time)
+                        fileWriter.write("$slotTime,$humanInTimeSlot\n")
                     }
                     fileWriter.close()
                     humanList.clear()
