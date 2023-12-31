@@ -33,26 +33,29 @@
     <androidx.camera.view.PreviewView
         android:id="@+id/viewFinder"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" >
+        android:layout_height="match_parent" />
 
-    </androidx.camera.view.PreviewView>
+    <org.badlyprogrammedtech.peopledetector_client.ObjectDetectionOverlay
+        android:id="@+id/objectDetectionOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
     <Button
-        android:id="@+id/image_capture_button"
-        android:layout_width="110dp"
-        android:layout_height="110dp"
+        android:id="@+id/write_detections_button"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
         android:layout_marginBottom="50dp"
         android:layout_marginEnd="50dp"
         android:elevation="2dp"
-        android:text="@string/take_photo"
+        android:text="@string/write_detections"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintEnd_toStartOf="@id/vertical_centerline" />
 
     <Button
         android:id="@+id/video_capture_button"
-        android:layout_width="110dp"
-        android:layout_height="110dp"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
         android:layout_marginBottom="50dp"
         android:layout_marginStart="50dp"
         android:elevation="2dp"

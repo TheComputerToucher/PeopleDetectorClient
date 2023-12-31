@@ -1,6 +1,8 @@
 package org.badlyprogrammedtech.peopledetector_client
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.ImageFormat
 import android.os.Environment
 import android.util.Log
 import android.widget.TextView
@@ -10,6 +12,7 @@ import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.task.core.BaseOptions
 import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
+import java.io.FileOutputStream
 import java.io.FileWriter
 import java.nio.ByteBuffer
 import java.time.Instant
@@ -21,11 +24,12 @@ import java.util.TimerTask
 
 class TensorFlowAnalyzer(private val context: Context, private val detectionsTextWidget: TextView, private val listener: (List<Detection>) -> Int) : ImageAnalysis.Analyzer {
     private var isInitialized = false
+    private var test = false
     private lateinit var objectDetector: ObjectDetector
     private var humanList = ArrayList<Human>()
     private val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
 
-    private var timerTask: TimerTask = object : TimerTask() {
+    var timerTask: TimerTask = object : TimerTask() {
         override fun run() {
             Log.i("TensorFlowAnalyzer", "Log task running")
 
@@ -125,6 +129,8 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
 
         isInitialized = true
 
+        timer = Timer()
+
         timer.schedule(timerTask, 15 * 1000) // Convert from Seconds to Milliseconds
     }
 
@@ -134,6 +140,14 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
         val bitmap = image.toBitmap()
 
         image.close()
+
+        if (!test) {
+            val stream = FileOutputStream("$downloadsDir/crap.png")
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+            stream.close()
+            test = true
+            Log.i("shit", "done")
+        }
 
         val tensorImage = TensorImage.fromBitmap(bitmap)
 

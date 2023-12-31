@@ -3,6 +3,7 @@ package org.badlyprogrammedtech.peopledetector_client
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.RectF
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -21,6 +22,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.core.Preview
 import androidx.camera.core.CameraSelector
 import android.util.Log
+import android.widget.Button
 import android.widget.TextView
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCaptureException
@@ -42,7 +44,15 @@ class MainActivity : AppCompatActivity() {
     //    private var booptupeDevices: ArrayList<BooptupeDevice> = ArrayList()
     private var timerTask: Any? = null
     private var timer: Timer? = null
-    private lateinit var analyzer: TensorFlowAnalyzer
+    private val faceBoundsOverlay = findViewById<ObjectDetectionOverlay>(R.id.objectDetectionOverlay)
+    private var analyzer: TensorFlowAnalyzer = TensorFlowAnalyzer(this, findViewById(R.id.detections_title)) { detections: List<Detection> ->
+        val rects = ArrayList<RectF>()
+
+        for (detection in detections) rects.add(detection.boundingBox)
+
+        faceBoundsOverlay.post { faceBoundsOverlay.drawObjectBounds(rects) }
+        Log.d(TAG, "Detections: $detections")
+    }
     val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
 
     private val activityResultLauncher =
@@ -120,6 +130,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        val faceBoundsOverlay = findViewById<ObjectDetectionOverlay>(R.id.objectDetectionOverlay)
 
         cameraProviderFuture.addListener({
             // Used to bind the lifecycle of cameras to the lifecycle owner
@@ -138,9 +149,7 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, TensorFlowAnalyzer(this, findViewById(R.id.detections_title)) { detections: List<Detection> ->
-                        Log.d(TAG, "Detections: $detections")
-                    })
+                    it.setAnalyzer(cameraExecutor, analyzer)
                 }
 
             try {
@@ -175,7 +184,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Set up the listeners for take photo and video capture buttons
-        viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
+        viewBinding.writeDetectionsButton.setOnClickListener { analyzer.timerTask.run() }
         viewBinding.videoCaptureButton.setOnClickListener { captureVideo() }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
