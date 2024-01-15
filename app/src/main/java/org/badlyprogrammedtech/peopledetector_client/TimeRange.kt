@@ -1,5 +1,6 @@
 package org.badlyprogrammedtech.peopledetector_client
 
+import android.util.Log
 import java.util.Calendar
 import java.util.Date
 
@@ -48,6 +49,11 @@ data class TimeRange(var first: Date, var last: Date) {
         val minutes = msToMinutes(time.time)
         val localMinutes = minutes - msToMinutes(first.time)
 
-        return Math.floorDiv(localMinutes.toInt(), slotCount)
+        try {
+            return Math.floorDiv(localMinutes.toInt(), slotCount)
+        } catch (e: Exception) {
+            Log.e("TimeRange", "getSlotFromTime($time, $slotCount) failed with error ${e.localizedMessage}, returning 0 as a fallback")
+            return 0
+        }
     }
 }

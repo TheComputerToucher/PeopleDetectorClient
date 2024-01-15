@@ -26,7 +26,7 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
     private var isInitialized = false
     private var test = false
     private lateinit var objectDetector: ObjectDetector
-    private var humanList = ArrayList<Human>()
+    var humanList = ArrayList<Human>()
     private val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
 
     var timerTask: TimerTask = object : TimerTask() {
@@ -34,7 +34,7 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
             Log.i("TensorFlowAnalyzer", "Log task running")
 
             try {
-                if (humanList.size > 1) {
+                if (humanList.size >= 1) {
                     val time = Calendar.getInstance().time
 
                     val fileNameTime = time.toString()
@@ -52,7 +52,12 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
                         timeRange.checkAndUpdateLast(it.timeDetected)
                     }
 
-                    val slotCount = timeRange.getMinutesBetween().floorDiv(timeBetweenSlots).toInt()
+                    var slotCount: Int = 0
+                    try {
+                        slotCount = timeRange.getMinutesBetween().floorDiv(timeBetweenSlots).toInt()
+                    } catch (e: Exception) {
+                        Log.e("TensorFlowAnalyzer", "slotCount failed with error ${e.localizedMessage}")
+                    }
                     val baseTime = timeRange.first
 
                     val timeSlots = ArrayList<HumanTimeSlot>()
@@ -60,7 +65,9 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
                     val humansInTimeSlots = ArrayList<Long>()
 
                     humanList.forEach {
-                        humansInTimeSlots[timeRange.getSlotFromTime(it.timeDetected, slotCount)]++
+                        val index = timeRange.getSlotFromTime(it.timeDetected, slotCount)
+                        if (index < humansInTimeSlots.size) humansInTimeSlots[index]++
+                        else humansInTimeSlots.add(index, 1)
                     }
 
                     val calendar = Calendar.getInstance()
@@ -158,6 +165,19 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
 
         detectionsTextWidget.post {
             detectionsTextWidget.text = detectionsText
+        }
+
+        val calendar = Calendar.getInstance()
+        detections.forEach { detection ->
+//            val isHuman = detection.categories.any {
+//                it.displayName == "person"
+//            }
+            val isHuman = true
+
+            if (isHuman) {
+                val human = Human(calendar.time, "")
+                humanList.add(human)
+            }
         }
 
         listener(detections)

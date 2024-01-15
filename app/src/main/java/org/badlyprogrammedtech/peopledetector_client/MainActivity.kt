@@ -22,8 +22,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.core.Preview
 import androidx.camera.core.CameraSelector
 import android.util.Log
-import android.widget.Button
-import android.widget.TextView
+import android.view.WindowManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCaptureException
 import org.badlyprogrammedtech.peopledetector_client.databinding.ActivityMainBinding
@@ -44,15 +43,8 @@ class MainActivity : AppCompatActivity() {
     //    private var booptupeDevices: ArrayList<BooptupeDevice> = ArrayList()
     private var timerTask: Any? = null
     private var timer: Timer? = null
-    private val faceBoundsOverlay = findViewById<ObjectDetectionOverlay>(R.id.objectDetectionOverlay)
-    private var analyzer: TensorFlowAnalyzer = TensorFlowAnalyzer(this, findViewById(R.id.detections_title)) { detections: List<Detection> ->
-        val rects = ArrayList<RectF>()
-
-        for (detection in detections) rects.add(detection.boundingBox)
-
-        faceBoundsOverlay.post { faceBoundsOverlay.drawObjectBounds(rects) }
-        Log.d(TAG, "Detections: $detections")
-    }
+    private lateinit var peopleBoundsOverlay: ObjectDetectionOverlay
+    private lateinit var analyzer: TensorFlowAnalyzer
     val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
 
     private val activityResultLauncher =
@@ -175,6 +167,17 @@ class MainActivity : AppCompatActivity() {
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
 
         setContentView(viewBinding.root)
+
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        peopleBoundsOverlay = findViewById<ObjectDetectionOverlay>(R.id.objectDetectionOverlay)
+        analyzer = TensorFlowAnalyzer(this, findViewById(R.id.detections_title)) { detections: List<Detection> ->
+            val rects = ArrayList<RectF>()
+
+            for (detection in detections) rects.add(detection.boundingBox)
+
+            peopleBoundsOverlay.post { peopleBoundsOverlay.drawObjectBounds(rects) }
+            Log.d(TAG, "Detections: $detections")
+        }
 
         // Request camera permissions
         if (allPermissionsGranted()) {
