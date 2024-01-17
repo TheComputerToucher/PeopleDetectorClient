@@ -2,9 +2,9 @@ package org.badlyprogrammedtech.peopledetector_client
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.ImageFormat
 import android.os.Environment
 import android.util.Log
+import android.util.TimeFormatException
 import android.widget.TextView
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -14,85 +14,54 @@ import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
 import java.io.FileOutputStream
 import java.io.FileWriter
+import java.lang.IndexOutOfBoundsException
 import java.nio.ByteBuffer
+import java.sql.Time
 import java.time.Instant
 import java.util.Calendar
 import java.util.Date
-import java.util.LinkedHashMap
 import java.util.Timer
 import java.util.TimerTask
 
 class TensorFlowAnalyzer(private val context: Context, private val detectionsTextWidget: TextView, private val listener: (List<Detection>) -> Int) : ImageAnalysis.Analyzer {
     private var isInitialized = false
     private var test = false
+    private val calendar = Calendar.getInstance()
     private lateinit var objectDetector: ObjectDetector
-    var humanList = ArrayList<Human>()
+    var timeSlots = ArrayList<HumanTimeSlot>()
     private val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+    private var frameCount: Int = 0
+    private var tempHumanCounts = ArrayList<Long>()
+    private lateinit var currentTimeRange: TimeRange
 
     var timerTask: TimerTask = object : TimerTask() {
         override fun run() {
             Log.i("TensorFlowAnalyzer", "Log task running")
 
             try {
-                if (humanList.size >= 1) {
-                    val time = Calendar.getInstance().time
+                val time = calendar.time
 
-                    val fileNameTime = time.toString()
-                        .replace(" ", "")
-                        .replace(":", "")
+                val fileNameTime = time.toString()
+                    .replace(" ", "")
+                    .replace(":", "")
 
-                    val fileWriter = FileWriter("$downloadsDir/scanner-$fileNameTime.csv")
-                    val timeRange = TimeRange(time, time)
+                val fileWriter = FileWriter("$downloadsDir/scanner-$fileNameTime.csv")
 
-                    humanList.forEach {
-                        // Check minimum
-                        timeRange.checkAndUpdateFirst(it.timeDetected)
-
-                        // Check maximum
-                        timeRange.checkAndUpdateLast(it.timeDetected)
-                    }
-
-                    var slotCount: Int = 0
-                    try {
-                        slotCount = timeRange.getMinutesBetween().floorDiv(timeBetweenSlots).toInt()
-                    } catch (e: Exception) {
-                        Log.e("TensorFlowAnalyzer", "slotCount failed with error ${e.localizedMessage}")
-                    }
-                    val baseTime = timeRange.first
-
-                    val timeSlots = ArrayList<HumanTimeSlot>()
-
-                    val humansInTimeSlots = ArrayList<Long>()
-
-                    humanList.forEach {
-                        val index = timeRange.getSlotFromTime(it.timeDetected, slotCount)
-                        if (index < humansInTimeSlots.size) humansInTimeSlots[index]++
-                        else humansInTimeSlots.add(index, 1)
-                    }
-
-                    val calendar = Calendar.getInstance()
-
-                    for (slot in 0..slotCount) {
-                        calendar.time = baseTime
-                        calendar.add(Calendar.MINUTE, slot * 30)
-                        timeSlots.add(HumanTimeSlot(calendar.time, humansInTimeSlots.get(slot)))
-                    }
-
-                    for (humanInTimeSlot in humansInTimeSlots) {
-                        val slotTime = Date(timeRange.minutesToMs(humanInTimeSlot) + timeRange.first.time)
-                        fileWriter.write("$slotTime,$humanInTimeSlot\n")
-                    }
-                    fileWriter.close()
-                    humanList.clear()
-                    Log.d("TensorFlowAnalyzer", "Log task complete") // "Log task complete (file empty, so not written)"
-                } else {
-                    Log.d("TensorFlowAnalyzer", "Log task complete (file empty, so not written)")
+                for (humanInTimeSlot in timeSlots) {
+                    val slotTime = humanInTimeSlot.time
+                    val slotPeople = humanInTimeSlot.humans
+                    fileWriter.write("$slotTime,$slotPeople\n")
                 }
+                fileWriter.close()
+                Log.d(
+                    "TensorFlowAnalyzer",
+                    "Log task complete"
+                ) // "Log task complete (file empty, so not written)"
             } catch (e: Error) {
                 Log.e("TensorFlowAnalyzer", "Log task failed with error $e")
             }
 
-            Log.i("TensorFlowAnalyzer", "Log task complete")
+//            Log.i("TensorFlowAnalyzer", "Log task complete")
         }
     }
     private lateinit var timer: Timer
@@ -138,7 +107,13 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
 
         timer = Timer()
 
-        timer.schedule(timerTask, 15 * 1000) // Convert from Seconds to Milliseconds
+        val delay: Long = 1 * 60 * 60 * 1000
+
+        timer.schedule(timerTask, delay) // Convert from Hours to Milliseconds
+
+        val delayedTime = Date(calendar.timeInMillis + delay)
+
+        currentTimeRange = TimeRange(calendar.time, delayedTime)
     }
 
     override fun analyze(image: ImageProxy) {
@@ -148,18 +123,17 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
 
         image.close()
 
-        if (!test) {
-            val stream = FileOutputStream("$downloadsDir/crap.png")
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-            stream.close()
-            test = true
-            Log.i("shit", "done")
-        }
+//        if (!test) {
+//            val stream = FileOutputStream("$downloadsDir/crap.png")
+//            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+//            stream.close()
+//            test = true
+//            Log.i("shit", "done")
+//        }
 
         val tensorImage = TensorImage.fromBitmap(bitmap)
 
         val detections = objectDetector.detect(tensorImage)
-        val detectionStr = detections.toString()
 
         val detectionsText: String = if (detections.isEmpty()) "Nothing was detected" else "Detections: $detections"
 
@@ -167,19 +141,72 @@ class TensorFlowAnalyzer(private val context: Context, private val detectionsTex
             detectionsTextWidget.text = detectionsText
         }
 
-        val calendar = Calendar.getInstance()
-        detections.forEach { detection ->
-//            val isHuman = detection.categories.any {
-//                it.displayName == "person"
-//            }
-            val isHuman = true
+        Log.i("frameCount", frameCount.toString())
 
-            if (isHuman) {
-                val human = Human(calendar.time, "")
-                humanList.add(human)
+        if (frameCount < 25) {
+            var humanCount: Long = 0
+            detections.forEach { detection ->
+                if (detection.toString().contains("person")) { // WHAT THE FUCK DID I JUST DO
+                    humanCount++
+                }
+                Log.i("TensorFlowAnalyzer", "Detection categories: ${detection.categories}")
             }
+            tempHumanCounts.add(frameCount, humanCount)
+            frameCount++
+        } else {
+            printDetections()
+            var index = 0
+            var maxNumber: Long = 0
+
+            while (index < tempHumanCounts.size) {
+                val countAtIndex: Long = tempHumanCounts.get(index)
+
+                if (maxNumber < countAtIndex)
+                    maxNumber = countAtIndex
+
+                index++
+            }
+
+            val slotNumber = currentTimeRange.getSlotFromTime(calendar.time, (currentTimeRange.getMillisBetween() / 30 * 60 * 1000).toInt())
+
+
+            try {
+                val slot = timeSlots[slotNumber]
+
+                slot.humans += maxNumber
+
+                timeSlots[slotNumber] = slot
+            } catch (e: IndexOutOfBoundsException) {
+                // Probably hasn't been initialized, so let's do that now
+                val currentTime = Calendar
+                    .getInstance()
+                    .time
+
+                if (timeSlots.size <= slotNumber) {
+                    var i = timeSlots.size
+                    while (i <= slotNumber) {
+                        val slotTimeMs = currentTime.time + (30 * 60 * 1000 * slotNumber)
+                        val slotTime = Date(slotTimeMs)
+                        val slotHumans = if (timeSlots.size == slotNumber) maxNumber else 0
+
+                        val slot = HumanTimeSlot(slotTime, slotHumans)
+
+                        timeSlots.add(slot)
+                        i++
+                    }
+                }
+            }
+
+            frameCount = 0
+
+            tempHumanCounts.clear()
         }
 
         listener(detections)
+    }
+
+    fun printDetections() {
+        Log.i("TensorFlowAnalyzer", "Detections: $timeSlots")
+        Log.i("TensorFlowAnalyzer", "Temp Detections: $tempHumanCounts")
     }
 }

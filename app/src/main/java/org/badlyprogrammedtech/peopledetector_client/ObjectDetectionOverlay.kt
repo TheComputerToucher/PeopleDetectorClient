@@ -7,7 +7,6 @@ import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
 import androidx.core.content.ContextCompat
-import org.tensorflow.lite.task.vision.detector.Detection
 
 class ObjectDetectionOverlay constructor(context: Context?, attributeSet: AttributeSet?) :
     View(context, attributeSet) {

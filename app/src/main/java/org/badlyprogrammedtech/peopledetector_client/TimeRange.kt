@@ -1,7 +1,6 @@
 package org.badlyprogrammedtech.peopledetector_client
 
 import android.util.Log
-import java.util.Calendar
 import java.util.Date
 
 data class TimeRange(var first: Date, var last: Date) {
@@ -24,9 +23,13 @@ data class TimeRange(var first: Date, var last: Date) {
     }
 
     fun getMinutesBetween(): Long {
+        return getMillisBetween() * 1000 * 60 * 60
+    }
+
+    fun getMillisBetween(): Long {
         return when (last.time - first.time) {
             in Long.MIN_VALUE..0 -> 0
-            else -> (last.time - first.time) * 1000 * 60 * 60
+            else -> (last.time - first.time)
         }
     }
 
@@ -45,15 +48,16 @@ data class TimeRange(var first: Date, var last: Date) {
         return minutes * minuteToMs
     }
 
-    fun getSlotFromTime(time: Date, slotCount: Int): Int {
+    fun getSlotFromTime(time: Date, slotCount: Int): Long {
         val minutes = msToMinutes(time.time)
         val localMinutes = minutes - msToMinutes(first.time)
 
-        try {
-            return Math.floorDiv(localMinutes.toInt(), slotCount)
+        return try {
+            val minutesPerSlot = Math.floorDiv(getMinutesBetween(), localMinutes)
+            Math.floorDiv(localMinutes, minutesPerSlot)
         } catch (e: Exception) {
             Log.e("TimeRange", "getSlotFromTime($time, $slotCount) failed with error ${e.localizedMessage}, returning 0 as a fallback")
-            return 0
+            0
         }
     }
 }

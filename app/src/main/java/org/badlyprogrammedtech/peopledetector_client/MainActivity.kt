@@ -8,28 +8,28 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
+import android.view.WindowManager
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.core.content.ContextCompat
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.core.Preview
-import androidx.camera.core.CameraSelector
-import android.util.Log
-import android.view.WindowManager
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageCaptureException
 import org.badlyprogrammedtech.peopledetector_client.databinding.ActivityMainBinding
 import org.tensorflow.lite.task.vision.detector.Detection
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.Timer
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
     private lateinit var viewBinding: ActivityMainBinding
@@ -168,6 +168,8 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(viewBinding.root)
 
+        cameraExecutor = Executors.newSingleThreadExecutor()
+
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         peopleBoundsOverlay = findViewById<ObjectDetectionOverlay>(R.id.objectDetectionOverlay)
         analyzer = TensorFlowAnalyzer(this, findViewById(R.id.detections_title)) { detections: List<Detection> ->
@@ -188,9 +190,7 @@ class MainActivity : AppCompatActivity() {
 
         // Set up the listeners for take photo and video capture buttons
         viewBinding.writeDetectionsButton.setOnClickListener { analyzer.timerTask.run() }
-        viewBinding.videoCaptureButton.setOnClickListener { captureVideo() }
-
-        cameraExecutor = Executors.newSingleThreadExecutor()
+        viewBinding.printDetectionsButton.setOnClickListener { analyzer.printDetections() }
     }
 
     override fun onDestroy() {
@@ -209,6 +209,9 @@ class MainActivity : AppCompatActivity() {
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
                     add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 }
-            }.toTypedArray()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+//                    add(Manifest.permission.MANAGE_MEDIA)
+                }
+        }.toTypedArray()
     }
 }
